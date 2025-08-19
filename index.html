@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>영상 생성 AI 리서치</title>
+  <style>
+    :root { --maxw: 1300px; --sidebar-w: 340px; }
+    body { font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif; margin:0; color:#111; background:#f8f9fb; }
+    header, footer { background:#fff; border-bottom:1px solid #e5e7eb; }
+    header { position:sticky; top:0; z-index:10; }
+    .wrap { max-width: var(--maxw); margin:0 auto; padding: 14px 16px; }
+    h1 { font-size:18px; margin:0; }
+    .meta { font-size:14px; color:#555; }
+
+    .layout { display:flex; gap:16px; align-items:flex-start; }
+    .sidebar {
+      width: var(--sidebar-w); min-width: var(--sidebar-w);
+      background:#fff; border:1px solid #e5e7eb; border-radius:14px;
+      overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.03);
+    }
+    .sidebar .head { padding:10px 12px; border-bottom:1px solid #eef2f7; font-weight:700; font-size:14px; color:#374151; }
+    .list { display:flex; flex-direction:column; padding:10px; gap:10px; max-height:70vh; overflow:auto; }
+    .item {
+      display:flex; gap:10px; align-items:center; padding:8px; border:1px solid #e5e7eb; border-radius:12px; background:#fff;
+      cursor:pointer; transition:background .15s, border-color .15s;
+    }
+    .item:hover { background:#f7fafc; }
+    .item.active { border-color:#111; background:#f0f2f5; }
+    .thumbBox { width:110px; aspect-ratio:16/9; background:#000; border-radius:8px; overflow:hidden; flex-shrink:0; }
+    .thumb { width:100%; height:100%; object-fit:cover; display:block; }
+    .label { font-size:14px; color:#111; font-weight:700; }
+    .sub { font-size:12px; color:#6b7280; }
+
+    .viewer { flex: 1 1 auto; display:flex; flex-direction:column; gap:12px; }
+    .viewerTitle { font-size:18px; font-weight:700; }
+    .viewerBox {
+      width: 100%; max-width: 1080px; aspect-ratio: 16/9;
+      border:1px solid #e5e7eb; border-radius:14px; overflow:hidden; background:#000;
+      box-shadow:0 1px 2px rgba(0,0,0,.03);
+    }
+    iframe.viewerFrame { width:100%; height:100%; border:0; display:block; }
+    .controls { display:flex; gap:8px; align-items:center; }
+    .btn { appearance:none; border:1px solid #111; background:#111; color:#fff; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer; }
+    .btn.outline { background:#fff; color:#111; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .select { padding:8px 10px; border-radius:10px; border:1px solid #d1d5db; background:#fff; }
+    .hint { font-size:12px; color:#6b7280; }
+    .noteBox { max-width:1080px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; line-height:1.5; }
+    .noteBox b { color:#111; }
+    @media (max-width: 1200px) {
+      .layout { flex-direction:column; }
+      .sidebar { width:100%; min-width:0; }
+      .viewerBox,.noteBox { max-width:100%; }
+    }
+    #title { visibility: hidden; }
+
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div>
+        <h1>영상 생성 AI 리서치</h1>
+        <div class="meta" id="metaText">Loading…</div>
+      </div>
+      <div class="controls">
+        <button class="btn outline" id="prevBtn" aria-label="Previous set">이전</button>
+        <select class="select" id="promptSelector" aria-label="Select prompt"></select>
+        <button class="btn" id="nextBtn" aria-label="Next set">다음</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap" style="padding-top:12px;">
+    <div id="title" class="viewerTitle"></div>
+
+    <div class="layout">
+      <!-- 좌측: 모델별 썸네일 리스트 -->
+      <aside class="sidebar">
+        <div class="head">모델별 영상</div>
+        <div id="list" class="list" aria-live="polite"></div>
+      </aside>
+
+      <!-- 우측: 뷰어 + 노트 -->
+      <section class="viewer">
+        <div class="viewerBox" id="viewerBox"></div>
+        <div id="noteBox" class="noteBox">—</div>
+        <div class="hint">좌측에서 모델을 선택하면 우측 1080px 뷰어에서 루프 재생됩니다.</div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap" style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; padding-bottom:14px;">
+      <div class="hint">GitHub Pages · CSV → JSON 자동 생성</div>
+      <div class="hint">키보드 ↑/↓: 모델 이동 · ←/→: 프롬프트 이동</div>
+    </div>
+  </footer>
+
+  <script>
+    // ---------- 유틸 ----------
+    const qs = (s, el=document) => el.querySelector(s);
+    const qsa = (s, el=document) => [...el.querySelectorAll(s)];
+    const escapeHtml = s => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+    const paramIndex = () => Math.max(0, parseInt(new URL(location.href).searchParams.get('p')||'0',10));
+    const setParamIndex = (i) => { const u=new URL(location.href); u.searchParams.set('p', i); history.replaceState({},'',u.toString()); };
+
+    // 유튜브 ID 추출(생 ID/URL/shorts/embed 혼용 안전)
+    function extractYtId(input) {
+      if (!input) return '';
+      const idLike = /^[a-zA-Z0-9_-]{10,12}$/;
+      if (idLike.test(input)) return input;
+      try {
+        const u = new URL(input);
+        if (u.hostname.includes('youtube.com')) {
+          if (u.searchParams.get('v')) return u.searchParams.get('v');
+          let m = u.pathname.match(/\/shorts\/([a-zA-Z0-9_-]+)/); if (m) return m[1];
+          m = u.pathname.match(/\/embed\/([a-zA-Z0-9_-]+)/);     if (m) return m[1];
+        }
+        if (u.hostname === 'youtu.be') {
+          const m = u.pathname.match(/^\/([a-zA-Z0-9_-]+)/);
+          if (m) return m[1];
+        }
+      } catch {}
+      const m = String(input).match(/(?:\?|&|^)v=([a-zA-Z0-9_-]{10,12})/);
+      return m ? m[1] : String(input).trim();
+    }
+
+    // 썸네일(저해상도 기본)
+    const ytThumb = (id) => `https://i.ytimg.com/vi/${id}/default.jpg`;
+
+    // 루프 임베드
+    const ytEmbed = (id, autoplay = false) => {
+      const vid = extractYtId(id);
+      const q = [
+        'rel=0','modestbranding=1','playsinline=1',
+        'loop=1',`playlist=${vid}`,
+        autoplay ? 'autoplay=1' : '','mute=1'
+      ].filter(Boolean).join('&');
+      return `https://www.youtube.com/embed/${vid}?${q}`;
+    };
+
+    // 노트(멀티라인) 포맷팅: 키워드 자동 볼드
+    function formatStructuredNote(str) {
+      const lines = String(str||'').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      return lines.map(line => {
+        const m = line.match(/^(Setting|Action|Visuals|Camera|Mood|Duration)\s*:\s*(.*)$/i);
+        if (m) return `<div><b>${escapeHtml(m[1])}</b>: ${escapeHtml(m[2])}</div>`;
+        return `<div>${escapeHtml(line)}</div>`;
+      }).join('');
+    }
+
+    // ---------- 상태 ----------
+    const INDEX_URL = 'prompts/index.json';
+    let indexData = { prompts: [] }; // [{title,file}]
+    let curPrompt = Math.max(0, paramIndex());
+    let curList = [];      // 현재 프롬프트의 videos
+    let curVideoIdx = 0;
+
+    function clearViewer() { qs('#viewerBox').innerHTML = ''; }
+    function mountViewer(id, label, autoplay = false) {
+    const box = qs('#viewerBox');
+    box.innerHTML = `<iframe class="viewerFrame" src="${ytEmbed(id, autoplay)}"
+        title="${escapeHtml(label || '')}"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+    }
+
+    function makeListItem(v, i) {
+      const vid = extractYtId(v.id);
+      const row = document.createElement('div');
+      row.className = 'item'; row.dataset.idx = String(i);
+      row.setAttribute('role','button'); row.setAttribute('tabindex','0');
+      row.innerHTML = `
+        <div class="thumbBox"><img class="thumb" loading="lazy" src="${ytThumb(vid)}" alt="${escapeHtml(v.label||('Video '+(i+1)))} thumbnail"></div>
+        <div>
+          <div class="label">${escapeHtml(v.label || ('Video '+(i+1)))}</div>
+          <div class="sub">${escapeHtml(vid)}</div>
+        </div>
+      `;
+      row.addEventListener('click', () => selectVideo(i, true));
+      row.addEventListener('keydown', (e) => {
+        if (e.key==='Enter' || e.key===' ') { e.preventDefault(); selectVideo(i, true); }
+        });
+    return row;
+    
+    }
+
+    function highlightActive() {
+      qsa('.item').forEach(el => el.classList.remove('active'));
+      const active = qs(`.item[data-idx="${curVideoIdx}"]`);
+      if (active) active.classList.add('active');
+    }
+
+    function selectVideo(i, autoplay = true) {
+        if (!curList.length) return;
+        if (i < 0) i = 0;
+        if (i >= curList.length) i = curList.length - 1;
+        curVideoIdx = i;
+        const v = curList[curVideoIdx];
+        mountViewer(v.id, v.label || `Video ${curVideoIdx+1}`, autoplay);
+        highlightActive();
+    }
+
+    async function renderPrompt(idx) {
+      if (!indexData.prompts.length) return;
+      if (idx < 0) idx = 0;
+      if (idx >= indexData.prompts.length) idx = indexData.prompts.length - 1;
+      curPrompt = idx; setParamIndex(curPrompt);
+
+      const meta = qs('#metaText');
+      const titleEl = qs('#title');
+      const listEl = qs('#list');
+      meta.textContent = `프롬프트 ${curPrompt+1} / ${indexData.prompts.length}`;
+      listEl.innerHTML = ''; clearViewer();
+      const item = indexData.prompts[curPrompt];
+      titleEl.textContent = item.title || `Prompt #${curPrompt+1}`;
+
+      try {
+        const res = await fetch(item.file, { cache:'no-store' });
+        if (!res.ok) throw new Error(`로드 실패: ${item.file}`);
+        const payload = await res.json();
+
+        // videos: [{id, label}] 을 그대로 표시(모델명 라벨)
+        curList = Array.isArray(payload.videos) ? payload.videos.filter(Boolean) : [];
+        curList.forEach((v,i) => listEl.appendChild(makeListItem(v,i)));
+
+        // note: 문자열이면 멀티라인 유지, 객체/배열도 허용
+        const noteHtml = payload.note ? formatStructuredNote(payload.note) : '';
+        qs('#noteBox').innerHTML = noteHtml || '—';
+
+        // 첫 항목 자동 선택
+        curVideoIdx = 0;
+        if (curList[0]) selectVideo(0, false);  // ← 처음엔 자동재생 OFF
+        else clearViewer();
+
+      } catch (e) {
+        listEl.innerHTML = `<div class="hint" style="padding:10px;">불러오는 중 오류: ${escapeHtml(e.message)}</div>`;
+        qs('#noteBox').textContent = '—';
+      }
+
+      // 셀렉터/버튼 상태
+      const sel = qs('#promptSelector');
+      if (sel.value !== String(curPrompt)) sel.value = String(curPrompt);
+      qs('#prevBtn').disabled = (curPrompt===0);
+      qs('#nextBtn').disabled = (curPrompt===indexData.prompts.length-1);
+
+      // 다음 프롬프트 프리페치
+      const nextItem = indexData.prompts[curPrompt+1];
+      if (nextItem) {
+        const l = document.createElement('link'); l.rel = 'prefetch'; l.as = 'fetch'; l.href = nextItem.file; document.head.appendChild(l);
+      }
+    }
+
+    async function init() {
+      const res = await fetch(INDEX_URL, { cache:'no-store' });
+      if (!res.ok) throw new Error('index.json 로딩 실패');
+      indexData = await res.json();
+      if (!Array.isArray(indexData.prompts)) indexData.prompts = [];
+
+      const sel = qs('#promptSelector'); sel.innerHTML='';
+      indexData.prompts.forEach((p,i)=>{ const opt=document.createElement('option'); opt.value=String(i); opt.textContent=`${i+1}. ${p.title||'Untitled'}`; sel.appendChild(opt); });
+
+      qs('#prevBtn').addEventListener('click', ()=>renderPrompt(curPrompt-1));
+      qs('#nextBtn').addEventListener('click', ()=>renderPrompt(curPrompt+1));
+      sel.addEventListener('change', e=>renderPrompt(parseInt(e.target.value,10)||0));
+      window.addEventListener('keydown', (e)=>{
+        if (e.key==='ArrowLeft' && curPrompt>0) renderPrompt(curPrompt-1);
+        if (e.key==='ArrowRight'&& curPrompt<indexData.prompts.length-1) renderPrompt(curPrompt+1);
+        if (e.key==='ArrowUp')  { e.preventDefault(); selectVideo(curVideoIdx-1); }
+        if (e.key==='ArrowDown'){ e.preventDefault(); selectVideo(curVideoIdx+1); }
+      });
+
+      await renderPrompt(paramIndex());
+    }
+
+    init().catch(err => { qs('#metaText').textContent = '초기화 실패: '+err.message; console.error(err); });
+  </script>
+</body>
+</html>

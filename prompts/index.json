@@ -1,0 +1,84 @@
+{
+  "prompts": [
+    {
+      "title": "P1 · Setting: A smooth dolly shot captures two young adults…",
+      "file": "prompts/p01.json"
+    },
+    {
+      "title": "P2 · Setting: A tracking shot follows a young girl walking…",
+      "file": "prompts/p02.json"
+    },
+    {
+      "title": "P3 · Setting: A handheld jittery camera captures two fighters…",
+      "file": "prompts/p03.json"
+    },
+    {
+      "title": "P4 · Setting: A smooth drone zoom captures a lioness chasing an…",
+      "file": "prompts/p04.json"
+    },
+    {
+      "title": "P5 · Setting: A handheld camera follows soldiers disembarking on…",
+      "file": "prompts/p05.json"
+    },
+    {
+      "title": "P6 · Setting: A child enters a glowing, surreal forest at…",
+      "file": "prompts/p06.json"
+    },
+    {
+      "title": "P7 · Setting: A single take dolly tracking shot glides through a…",
+      "file": "prompts/p07.json"
+    },
+    {
+      "title": "P8 · Setting: A hanbok-clad woman stands beneath a palace gate…",
+      "file": "prompts/p08.json"
+    },
+    {
+      "title": "P9 · Setting: Inside a shaking spaceship cockpit, a pilot…",
+      "file": "prompts/p09.json"
+    },
+    {
+      "title": "P10 · Setting: A dolly-out shot at sunrise reveals a massive…",
+      "file": "prompts/p10.json"
+    },
+    {
+      "title": "P11 · Setting: A contemporary dancer performs in an abandoned…",
+      "file": "prompts/p11.json"
+    },
+    {
+      "title": "P12 · Setting: A time-lapse wide shot shows Tokyo skyline…",
+      "file": "prompts/p12.json"
+    },
+    {
+      "title": "P13 · Setting: Survivors walk across an orange-sand desert under…",
+      "file": "prompts/p13.json"
+    },
+    {
+      "title": "P14 · Setting: An old wizard stirs a glowing potion in a…",
+      "file": "prompts/p14.json"
+    },
+    {
+      "title": "P15 · Setting: A scuba diver’s hand moves gently over a coral…",
+      "file": "prompts/p15.json"
+    },
+    {
+      "title": "P16 · Setting: An overhead drone captures cavalry charging into a…",
+      "file": "prompts/p16.json"
+    },
+    {
+      "title": "P17 · Setting: A model walks through sunlit curtains in a silk…",
+      "file": "prompts/p17.json"
+    },
+    {
+      "title": "P18 · Setting: A beetle slowly climbs a dew-covered leaf in macro…",
+      "file": "prompts/p18.json"
+    },
+    {
+      "title": "P19 · Setting: Two teens sit on a school rooftop at sunset,…",
+      "file": "prompts/p19.json"
+    },
+    {
+      "title": "P20 · Setting: A performer sings in front of a CRT wall with…",
+      "file": "prompts/p20.json"
+    }
+  ]
+}
