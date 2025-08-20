@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>영상 생성 AI 리서치</title>
+  <title>영상 생성 AI 리서치2</title>
   <style>
     :root { --maxw: 1300px; --sidebar-w: 340px; }
     body { font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif; margin:0; color:#111; background:#f8f9fb; }
@@ -55,6 +55,54 @@
     }
     #title { visibility: hidden; }
 
+    /* ====== Mobile tweaks (<= 640px) ====== */
+    @media (max-width: 640px) {
+      :root { --sidebar-w: 100%; }          /* 좌측 패널을 가로폭 100%로 */
+      .wrap { padding: 10px 12px; }
+
+      /* 헤더: 제목/메타 줄바꿈 방지 + 길면 생략표시, 메타는 숨김 */
+      h1 { font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:60vw; }
+      #metaText { display:none; }
+
+      /* 헤더 컨트롤: 좁을 때 가로 스크롤 허용(겹침 방지) */
+      .controls { gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+      .controls .select { max-width:70vw; }
+
+      /* 본문 레이아웃: 세로 스택, 카드 폭 100% */
+      .layout { flex-direction:column; gap:12px; }
+      .sidebar { width:100%; min-width:0; }
+      .viewerBox, .noteBox { max-width:100%; }
+
+      /* 리스트: 높이 줄여 스크롤, 터치 타깃 키우기 */
+      .list { max-height:42vh; }
+      .item { padding:10px; }
+      .thumbBox { width:120px; }            /* 필요시 110→120으로 살짝 키움 */
+      .label { font-size:15px; }
+      .sub   { font-size:11px; color:#777; }
+
+      /* (선택) 페이지 상단의 프롬프트 제목 줄은 모바일에서 숨겨 공간 확보
+          - 여백 유지 원하면 visibility:hidden; 공간 회수 원하면 display:none; */
+      /* #title { display:none; } */
+      /*용량을 바꿔서 테스트 하기 위해 적어줌 */
+
+    }
+
+    @media (max-width: 640px) {
+      .controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto;
+        gap: 8px;
+        width: 100%;
+      }
+      #prevBtn { grid-column: 1 / 2; }
+      #nextBtn { grid-column: 2 / 3; }
+      #promptSelector {
+        grid-column: 1 / -1;   /* 셀렉트가 한 줄 전체 */
+        max-width: 100%;       /* 2번의 70vw를 덮어씀 (ID가 더 강함) */
+        font-size: 14px;
+      }
+    }
   </style>
 </head>
 <body>
