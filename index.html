@@ -18,11 +18,14 @@
       width:var(--sidebar-w); min-width:var(--sidebar-w);
       background:#fff; border:1px solid #e5e7eb; border-radius:14px;
       overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.03);
+      display:flex; flex-direction:column;
     }
-    .sidebar .head { padding:10px 12px; border-bottom:1px solid #eef2f7; font-weight:700; font-size:14px; color:#374151; }
-    .list { display:flex; flex-direction:column; padding:10px; gap:10px; max-height:70vh; overflow:auto; }
+    .sidebar .head { padding:10px 12px; border-bottom:1px solid #eef2f7; font-weight:700; font-size:14px; color:#374151; display:flex; justify-content:space-between; align-items:center;}
+    .list { display:flex; flex-direction:column; padding:10px; gap:10px; max-height:60vh; overflow:auto; }
+    .savePanel { margin-top:auto; border-top:1px solid #eef2f7; padding:10px; display:flex; gap:8px; align-items:center; }
+    .savePanel .select { flex:1 1 auto; }
 
-    /* 리스트 아이템: 좌측 정보(썸네일+모델명) 클릭 = 재생, 우측 버튼 = 순위 */
+    /* 리스트 아이템: 좌측 정보(썸네일+모델명) 클릭 = 재생, 우측 버튼 = 순차 선택 */
     .item {
       display:flex; align-items:center; justify-content:space-between;
       gap:10px; padding:8px; border:1px solid #e5e7eb; border-radius:12px;
@@ -35,15 +38,15 @@
     .thumb { width:100%; height:100%; object-fit:cover; display:block; }
     .label { font-size:14px; color:#111; font-weight:700; }
 
-    /* 우측 순위 버튼 열 */
-    .rankCol { display:flex; align-items:center; gap:6px; flex-shrink:0; }
-    .rankBtns { display:flex; gap:4px; }
+    /* 우측 순위 선택 영역 */
+    .rankCol { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+    .rankTag { font-size:12px; font-weight:700; color:#2563eb; min-width:22px; text-align:center; }
     .rankBtn {
       border:1px solid #d1d5db; background:#f9fafb; color:#374151;
-      font-size:12px; padding:4px 6px; border-radius:6px; cursor:pointer;
+      font-size:12px; padding:4px 8px; border-radius:6px; cursor:pointer;
     }
-    .rankBtn.active { background:#2563eb; border-color:#2563eb; color:#fff; }
-    .rankTag { font-size:12px; font-weight:700; color:#2563eb; min-width:22px; text-align:center; }
+    .rankBtn[disabled] { opacity:.55; cursor:not-allowed; }
+    .undoBtn { border:1px solid #ef4444; color:#ef4444; background:#fff; }
 
     .viewer { flex:1 1 auto; display:flex; flex-direction:column; gap:10px; }
     .viewerBox {
@@ -72,9 +75,8 @@
       .layout{flex-direction:column;gap:12px;}
       .sidebar{width:100%;min-width:0;}
       .viewerBox{max-width:100%;}
-      .list{max-height:42vh;}
+      .list{max-height:44vh;}
       .thumbBox{width:120px;}
-      .rankBtns { gap:6px; }
     }
   </style>
 </head>
@@ -96,17 +98,23 @@
 <main class="wrap" style="padding-top:12px;">
   <div class="layout">
     <aside class="sidebar">
-      <div class="head">영상 목록 (우측 버튼으로 순위 지정)</div>
+      <div class="head">
+        <span>영상 목록 (우측 버튼으로 순차 지정)</span>
+        <span class="hint" id="progressHint">0/5</span>
+      </div>
       <div id="list" class="list" aria-live="polite"></div>
+
+      <!-- 좌측 하단 저장 영역 -->
+      <div class="savePanel">
+        <input id="respondentInput" type="text" class="select" placeholder="이름 (필수-이벤트응모)">
+        <button class="btn" id="submitBtn" disabled>저장</button>
+      </div>
     </aside>
+
     <section class="viewer">
       <div class="viewerBox" id="viewerBox"></div>
       <div id="noteBox" class="hint"></div>
-      <div class="controls">
-        <input id="respondentInput" type="text" class="select" placeholder="이름 (선택)">
-        <button class="btn" id="submitBtn" disabled>저장</button>
-      </div>
-      <div class="hint">썸네일/모델명을 클릭하면 우측에서 재생 · 숫자 버튼(1~5)으로 선호 순위 지정</div>
+      <div class="hint">썸네일/모델명 영역 클릭 → 우측에서 재생 · 가장 품질이 좋은 모델부터 순서대로 <b>순위지정</b> 버튼을 누르면 1위부터 순차적으로 평가 됨 · <b>선택취소</b>는 직전 순위지정만 가능</div>
     </section>
   </div>
 </main>
@@ -121,25 +129,39 @@
 <script>
 const INDEX_URL='prompts/index.json';
 const FORM_ACTION='https://docs.google.com/forms/d/e/1FAIpQLSdM9-XgDDEj6ger_I6CnpnUo6xi0OOBoJH3fuVcSweapVnyLA/formResponse';
-const ENTRY={
-  respondent:'entry.1754968065',
-  prompt:'entry.687308874',
-  SORA:'entry.1657125172',
-  VEO3:'entry.1802394734',
-  LUMALabs:'entry.675826076',
-  'WAN2.2':'entry.1513721864',
-  'LTX-Video':'entry.360849732',
-  order:'entry.783496875'
+// const ENTRY={
+//  respondent:'entry.1754968065',
+//  prompt:'entry.687308874',
+  //SORA:'entry.1657125172',
+//  VEO3:'entry.1802394734',
+//  LUMALabs:'entry.675826076',
+//  'WAN2.2':'entry.1513721864',
+//  'LTX-Video':'entry.360849732',
+//  order:'entry.783496875'
+//};
+
+const ENTRY = {
+  respondent: 'entry.577493348',   // Name
+  prompt:     'entry.1100587388',  // Prompt_ID
+  SORA:       'entry.590964581',
+  VEO3:       'entry.594922169',
+  LUMALabs:   'entry.329427994',
+  'WAN v2.2': 'entry.710987574',
+  'LTX-Video':'entry.1025399171',
+  order:      'entry.1770970872'   // OrderString
 };
+
+
+
 
 let indexData={prompts:[]};
 let curPrompt=0,curList=[],curVideoIdx=0;
 
-// 순위 상태: 각 모델 인덱스 -> 랭크(1..5) 또는 null, 그리고 rank -> idx 역매핑으로 유일성 보장
-let ranksByIdx=[], idxByRank=[];
+// 순차 선택 스택 (LIFO). 항목은 {idx, label}
+let ranking=[];
 
 const savedName = localStorage.getItem('respondentName')||'';
-document.getElementById('respondentInput').value=savedName;
+document.addEventListener('DOMContentLoaded', ()=> { document.getElementById('respondentInput').value=savedName; });
 
 const qs=(s,el=document)=>el.querySelector(s);
 const qsa=(s,el=document)=>[...el.querySelectorAll(s)];
@@ -168,41 +190,51 @@ function highlightActive(){
   const act=qs(`.item[data-idx="${curVideoIdx}"]`); if (act) act.classList.add('active');
 }
 
+function getRankOfIdx(idx){
+  const pos = ranking.findIndex(r=>r.idx===idx);
+  return (pos>=0) ? pos+1 : null;
+}
+function isLastSelected(idx){
+  if (!ranking.length) return false;
+  return ranking[ranking.length-1].idx===idx;
+}
+function progressText(){
+  return `${ranking.length}/${curList.length || 5}`;
+}
 function setSubmitEnabled(){
-  const complete = ranksByIdx.length===curList.length && ranksByIdx.every(x=>typeof x==='number' && x>=1 && x<=5);
-  qs('#submitBtn').disabled = !complete;
+  const nameFilled = !!qs('#respondentInput').value.trim();
+  const doneAll = ranking.length === curList.length && curList.length>0;
+  qs('#submitBtn').disabled = !(nameFilled && doneAll);
+  qs('#progressHint').textContent = progressText();
 }
 
-/* 랭크 지정: 기존에 그 랭크/그 모델에 있던 값은 정리하고 새로 할당 (유일성 보장) */
-function assignRank(idx, rank){
-  if(rank<1 || rank>5) return;
-  const prevRank = ranksByIdx[idx];
-  if (prevRank === rank) {
-    // 같은 버튼을 다시 누르면 해당 랭크 유지(토글 해제 원하면 아래 주석 해제)
-    // clearRank(idx);
-    return;
+/* 순차 선택: 아직 선택 안된 아이템이면 push; 이미 선택된 아이템이면 "직전 선택"일 때만 pop */
+function toggleSequential(idx,label){
+  const pos = ranking.findIndex(r=>r.idx===idx);
+  if (pos>=0){
+    // 이미 선택됨 → 직전일 때만 취소
+    if (pos === ranking.length-1){
+      ranking.pop();
+    } else {
+      // 직전이 아니면 무시 (시각 피드백만)
+      const btn = qs(`#rankBtn-${idx}`);
+      if (btn){ btn.animate([{transform:'scale(1)'},{transform:'scale(1.05)'},{transform:'scale(1)'}],{duration:180}); }
+      return;
+    }
+  } else {
+    if (ranking.length < curList.length){
+      ranking.push({idx,label});
+    }
   }
-  // 1) 그 랭크에 다른 모델이 이미 있으면 해제
-  const conflictIdx = idxByRank[rank];
-  if (typeof conflictIdx === 'number') {
-    ranksByIdx[conflictIdx] = null;
-    idxByRank[rank] = null;
-  }
-  // 2) 이 모델에 기존 랭크 있었으면 해제
-  if (typeof prevRank === 'number') idxByRank[prevRank] = null;
-
-  // 3) 신규 할당
-  ranksByIdx[idx] = rank;
-  idxByRank[rank] = idx;
-  renderList(false); // 버튼 상태만 갱신
+  renderList(false);
   setSubmitEnabled();
 }
 
-function renderList(resetButtons=true){
-  const listEl=qs('#list'); if (resetButtons) listEl.innerHTML='';
+function renderList(reset=true){
+  const listEl=qs('#list'); if(reset) listEl.innerHTML='';
   curList.forEach((v,i)=>{
     let row = qs(`.item[data-idx="${i}"]`);
-    if (!row) {
+    if (!row){
       row = document.createElement('div');
       row.className='item'; row.dataset.idx=i;
       row.innerHTML=`
@@ -212,34 +244,34 @@ function renderList(resetButtons=true){
         </div>
         <div class="rankCol">
           <span class="rankTag" id="rankTag-${i}"></span>
-          <div class="rankBtns" id="rankBtns-${i}"></div>
+          <button class="rankBtn" id="rankBtn-${i}" type="button">순위지정</button>
+          <button class="rankBtn undoBtn" id="undoBtn-${i}" type="button" style="display:none;">선택취소</button>
         </div>`;
       // 좌측 정보 클릭 -> 영상 재생만
       row.querySelector('.info').addEventListener('click', ()=>selectVideo(i, true));
+      // 우측 선택/되돌리기
+      row.querySelector(`#rankBtn-${i}`).addEventListener('click', (e)=>{ e.stopPropagation(); toggleSequential(i, v.label); });
+      row.querySelector(`#undoBtn-${i}`).addEventListener('click', (e)=>{ e.stopPropagation(); toggleSequential(i, v.label); });
       listEl.appendChild(row);
     }
-    // 버튼 갱신
-    const btnBox = row.querySelector(`#rankBtns-${i}`);
-    if (resetButtons) btnBox.innerHTML='';
-    const myRank = ranksByIdx[i];
-    if (resetButtons) {
-      for (let r=1; r<=5; r++){
-        const b=document.createElement('button');
-        b.className='rankBtn'+(myRank===r?' active':'');
-        b.textContent=r;
-        b.addEventListener('click',(e)=>{ e.stopPropagation(); assignRank(i, r); });
-        btnBox.appendChild(b);
-      }
-    } else {
-      // active 상태만 업데이트
-      qsa('.rankBtn', btnBox).forEach((b,idx)=> {
-        const r = idx+1;
-        b.classList.toggle('active', myRank===r);
-      });
-    }
-    // 태그(몇 위) 갱신
+    // 상태 반영
+    const r = getRankOfIdx(i);
     const tag = row.querySelector(`#rankTag-${i}`);
-    tag.textContent = (typeof myRank==='number') ? `${myRank}위` : '';
+    const pickBtn = row.querySelector(`#rankBtn-${i}`);
+    const undoBtn = row.querySelector(`#undoBtn-${i}`);
+
+    tag.textContent = r ? `${r}위` : '';
+    if (!r){ // 미선택
+      pickBtn.disabled = (ranking.length>=curList.length); // 5개 꽉 차면 더 못 고름
+      pickBtn.style.display = '';
+      undoBtn.style.display = 'none';
+    } else { // 선택됨
+      // 직전 선택만 되돌리기 허용
+      const last = isLastSelected(i);
+      pickBtn.style.display = last ? 'none' : '';
+      pickBtn.disabled = true;
+      undoBtn.style.display = last ? '' : 'none';
+    }
   });
   highlightActive();
 }
@@ -260,8 +292,8 @@ async function renderPrompt(idx){
   qs('#metaText').textContent = `프롬프트 ${idx+1}/${indexData.prompts.length}`;
 
   // 초기화
-  ranksByIdx = []; idxByRank = [];
-  qs('#submitBtn').disabled = true;
+  ranking = [];
+  setSubmitEnabled();
 
   // 노트/비디오
   const item=indexData.prompts[idx];
@@ -269,8 +301,6 @@ async function renderPrompt(idx){
     const res=await fetch(item.file,{cache:'no-store'});
     const payload=await res.json();
     curList = payload.videos || [];
-    ranksByIdx = new Array(curList.length).fill(null);
-    idxByRank = new Array(6).fill(null); // 1..5 사용
     renderList(true);
     // 노트
     qs('#noteBox').innerHTML = payload.note ? formatStructuredNote(payload.note) : '';
@@ -286,6 +316,7 @@ async function renderPrompt(idx){
   const sel=qs('#promptSelector'); if (sel.value!==String(idx)) sel.value=String(idx);
   qs('#prevBtn').disabled = (idx===0);
   qs('#nextBtn').disabled = (idx===indexData.prompts.length-1);
+  setSubmitEnabled();
 }
 
 async function init(){
@@ -294,7 +325,7 @@ async function init(){
   indexData=await res.json();
   if(!Array.isArray(indexData.prompts)) indexData.prompts=[];
 
-  // 드롭다운 구성 (긴 제목은 자동 생략)
+  // 드롭다운 구성
   const sel=qs('#promptSelector'); sel.innerHTML='';
   indexData.prompts.forEach((p,i)=>{
     const o=document.createElement('option');
@@ -309,10 +340,10 @@ async function init(){
   qs('#nextBtn').addEventListener('click',()=>renderPrompt(curPrompt+1));
   sel.addEventListener('change',e=>renderPrompt(parseInt(e.target.value,10)||0));
 
-  // 응답자 이름 저장
+  // 이름(필수)
   const nameInput=qs('#respondentInput');
-  nameInput.addEventListener('blur',()=>localStorage.setItem('respondentName',nameInput.value.trim()));
-  nameInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); localStorage.setItem('respondentName',nameInput.value.trim()); }});
+  nameInput.addEventListener('input', ()=>{ setSubmitEnabled(); });
+  nameInput.addEventListener('blur', ()=> localStorage.setItem('respondentName', nameInput.value.trim()));
 
   // 저장
   qs('#submitBtn').addEventListener('click', submitPoll);
@@ -321,29 +352,27 @@ async function init(){
 }
 
 function currentPromptId(){
-  // prompts[index].id가 있으면 사용, 없으면 P<N>
   const meta = indexData.prompts[curPrompt];
   return meta && meta.id ? meta.id : ('P'+(curPrompt+1));
 }
 
 async function submitPoll(){
-  // 모든 모델에 1~5가 지정되어 있어야 저장 가능
-  if(!(ranksByIdx.length===curList.length && ranksByIdx.every(x=>typeof x==='number'))) {
-    alert('5개 모두 순위를 지정해주세요.');
-    return;
-  }
   const respondent = qs('#respondentInput').value.trim();
+  if (!respondent) { alert('이름은 필수입니다. (이벤트 응모)'); return; }
+  if (ranking.length !== curList.length){ alert('5개 모두 순위를 지정해주세요.'); return; }
   localStorage.setItem('respondentName', respondent);
 
-  // OrderString = 모델 순서대로의 랭크를 이어붙인 문자열(예: '34512')
-  const orderString = ranksByIdx.join('');
+  // 모델별 랭크 맵 만들기
+  const rankMap = new Map(); // idx -> rank(1..N)
+  ranking.forEach((r, i)=> rankMap.set(r.idx, i+1));
+  const orderString = curList.map((_,i)=>rankMap.get(i)||'').join('');
 
   const form = new URLSearchParams();
   form.append(ENTRY.respondent, respondent);
   form.append(ENTRY.prompt, currentPromptId());
-  curList.forEach((v, idx)=>{
-    const ek = ENTRY[v.label];            // SORA/VEO3/LUMALabs/WAN2.2/LTX-Video
-    if (ek) form.append(ek, String(ranksByIdx[idx]||'')); // 1..5
+  curList.forEach((v,i)=>{
+    const ek = ENTRY[v.label];
+    if (ek) form.append(ek, String(rankMap.get(i)||'')); // 1..5
   });
   if (ENTRY.order) form.append(ENTRY.order, orderString);
 
