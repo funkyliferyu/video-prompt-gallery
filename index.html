@@ -1,357 +1,367 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>영상 생성 AI 리서치2</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>영상 프롬프트 갤러리 + Poll</title>
   <style>
-    :root { --maxw: 1300px; --sidebar-w: 340px; }
-    body { font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif; margin:0; color:#111; background:#f8f9fb; }
+    :root { --maxw: 1200px; --sidebar-w: 330px; }
+    body { font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif; margin:0; color:#111; background:#f8f9fb; }
     header, footer { background:#fff; border-bottom:1px solid #e5e7eb; }
     header { position:sticky; top:0; z-index:10; }
-    .wrap { max-width: var(--maxw); margin:0 auto; padding: 14px 16px; }
+    .wrap { max-width:var(--maxw); margin:0 auto; padding:14px 16px; }
     h1 { font-size:18px; margin:0; }
     .meta { font-size:14px; color:#555; }
 
     .layout { display:flex; gap:16px; align-items:flex-start; }
     .sidebar {
-      width: var(--sidebar-w); min-width: var(--sidebar-w);
+      width:var(--sidebar-w); min-width:var(--sidebar-w);
       background:#fff; border:1px solid #e5e7eb; border-radius:14px;
       overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.03);
     }
     .sidebar .head { padding:10px 12px; border-bottom:1px solid #eef2f7; font-weight:700; font-size:14px; color:#374151; }
     .list { display:flex; flex-direction:column; padding:10px; gap:10px; max-height:70vh; overflow:auto; }
+
+    /* 리스트 아이템: 좌측 정보(썸네일+모델명) 클릭 = 재생, 우측 버튼 = 순위 */
     .item {
-      display:flex; gap:10px; align-items:center; padding:8px; border:1px solid #e5e7eb; border-radius:12px; background:#fff;
-      cursor:pointer; transition:background .15s, border-color .15s;
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px; padding:8px; border:1px solid #e5e7eb; border-radius:12px;
+      background:#fff; transition:background .15s, border-color .15s;
     }
     .item:hover { background:#f7fafc; }
     .item.active { border-color:#111; background:#f0f2f5; }
+    .info { display:flex; gap:10px; align-items:center; flex:1 1 auto; cursor:pointer; }
     .thumbBox { width:110px; aspect-ratio:16/9; background:#000; border-radius:8px; overflow:hidden; flex-shrink:0; }
     .thumb { width:100%; height:100%; object-fit:cover; display:block; }
     .label { font-size:14px; color:#111; font-weight:700; }
-    .sub { font-size:12px; color:#6b7280; }
 
-    .viewer { flex: 1 1 auto; display:flex; flex-direction:column; gap:12px; }
-    .viewerTitle { font-size:18px; font-weight:700; }
+    /* 우측 순위 버튼 열 */
+    .rankCol { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+    .rankBtns { display:flex; gap:4px; }
+    .rankBtn {
+      border:1px solid #d1d5db; background:#f9fafb; color:#374151;
+      font-size:12px; padding:4px 6px; border-radius:6px; cursor:pointer;
+    }
+    .rankBtn.active { background:#2563eb; border-color:#2563eb; color:#fff; }
+    .rankTag { font-size:12px; font-weight:700; color:#2563eb; min-width:22px; text-align:center; }
+
+    .viewer { flex:1 1 auto; display:flex; flex-direction:column; gap:10px; }
     .viewerBox {
-      width: 100%; max-width: 1080px; aspect-ratio: 16/9;
+      width:100%; max-width:1080px; aspect-ratio:16/9;
       border:1px solid #e5e7eb; border-radius:14px; overflow:hidden; background:#000;
       box-shadow:0 1px 2px rgba(0,0,0,.03);
     }
     iframe.viewerFrame { width:100%; height:100%; border:0; display:block; }
-    .controls { display:flex; gap:8px; align-items:center; }
-    .btn { appearance:none; border:1px solid #111; background:#111; color:#fff; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer; }
+    .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .btn { border:1px solid #111; background:#111; color:#fff; padding:8px 12px; border-radius:10px; font-weight:700; cursor:pointer; }
     .btn.outline { background:#fff; color:#111; }
     .btn:disabled { opacity:.5; cursor:not-allowed; }
-    .select { padding:8px 10px; border-radius:10px; border:1px solid #d1d5db; background:#fff; }
+    .select { padding:6px 10px; border-radius:10px; border:1px solid #d1d5db; background:#fff; }
     .hint { font-size:12px; color:#6b7280; }
-    .noteBox { max-width:1080px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; line-height:1.5; }
-    .noteBox b { color:#111; }
-    @media (max-width: 1200px) {
-      .layout { flex-direction:column; }
-      .sidebar { width:100%; min-width:0; }
-      .viewerBox,.noteBox { max-width:100%; }
-    }
-    #title { visibility: hidden; }
 
-    /* ====== Mobile tweaks (<= 640px) ====== */
-    @media (max-width: 640px) {
-      :root { --sidebar-w: 100%; }          /* 좌측 패널을 가로폭 100%로 */
-      .wrap { padding: 10px 12px; }
-
-      /* 헤더: 제목/메타 줄바꿈 방지 + 길면 생략표시, 메타는 숨김 */
-      h1 { font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:60vw; }
-      #metaText { display:none; }
-
-      /* 헤더 컨트롤: 좁을 때 가로 스크롤 허용(겹침 방지) */
-      .controls { gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-      .controls .select { max-width:70vw; }
-
-      /* 본문 레이아웃: 세로 스택, 카드 폭 100% */
-      .layout { flex-direction:column; gap:12px; }
-      .sidebar { width:100%; min-width:0; }
-      .viewerBox, .noteBox { max-width:100%; }
-
-      /* 리스트: 높이 줄여 스크롤, 터치 타깃 키우기 */
-      .list { max-height:42vh; }
-      .item { padding:10px; }
-      .thumbBox { width:120px; }            /* 필요시 110→120으로 살짝 키움 */
-      .label { font-size:15px; }
-      .sub   { font-size:11px; color:#777; }
-
-      /* (선택) 페이지 상단의 프롬프트 제목 줄은 모바일에서 숨겨 공간 확보
-          - 여백 유지 원하면 visibility:hidden; 공간 회수 원하면 display:none; */
-      #title { display: none; }              /* 공간도 제거 */
-      /* #title { display:none; } */
-      /*용량을 바꿔서 테스트 하기 위해 적어줌 */
-
-    }
-
-    @media (max-width: 640px) {
-      .controls {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto auto;
-        gap: 8px;
-        width: 100%;
-      }
-      #prevBtn { grid-column: 1 / 2; }
-      #nextBtn { grid-column: 2 / 3; }
-      #promptSelector {
-        grid-column: 1 / -1;   /* 셀렉트가 한 줄 전체 */
-        max-width: 100%;       /* 2번의 70vw를 덮어씀 (ID가 더 강함) */
-        font-size: 14px;
-      }
+    /* 모바일 대응 */
+    @media (max-width:640px){
+      :root{--sidebar-w:100%;}
+      .wrap{padding:10px 12px;}
+      h1{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60vw;}
+      #metaText{display:none;}
+      .controls{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:8px;width:100%;}
+      #prevBtn{grid-column:1/2;}
+      #nextBtn{grid-column:2/3;}
+      #promptSelector{grid-column:1/-1;max-width:100%;font-size:14px;}
+      .layout{flex-direction:column;gap:12px;}
+      .sidebar{width:100%;min-width:0;}
+      .viewerBox{max-width:100%;}
+      .list{max-height:42vh;}
+      .thumbBox{width:120px;}
+      .rankBtns { gap:6px; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="wrap" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-      <div>
-        <h1>영상 생성 AI 리서치</h1>
-        <div class="meta" id="metaText">Loading…</div>
-      </div>
+<header>
+  <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+    <div>
+      <h1>영상 프롬프트 갤러리</h1>
+      <div class="meta" id="metaText">Loading…</div>
+    </div>
+    <div class="controls">
+      <button class="btn outline" id="prevBtn">이전</button>
+      <select class="select" id="promptSelector" aria-label="프롬프트 선택"></select>
+      <button class="btn" id="nextBtn">다음</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" style="padding-top:12px;">
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="head">영상 목록 (우측 버튼으로 순위 지정)</div>
+      <div id="list" class="list" aria-live="polite"></div>
+    </aside>
+    <section class="viewer">
+      <div class="viewerBox" id="viewerBox"></div>
+      <div id="noteBox" class="hint"></div>
       <div class="controls">
-        <button class="btn outline" id="prevBtn" aria-label="Previous set">이전</button>
-        <select class="select" id="promptSelector" aria-label="Select prompt"></select>
-        <button class="btn" id="nextBtn" aria-label="Next set">다음</button>
+        <input id="respondentInput" type="text" class="select" placeholder="이름 (선택)">
+        <button class="btn" id="submitBtn" disabled>저장</button>
       </div>
-    </div>
-  </header>
+      <div class="hint">썸네일/모델명을 클릭하면 우측에서 재생 · 숫자 버튼(1~5)으로 선호 순위 지정</div>
+    </section>
+  </div>
+</main>
 
-  <main class="wrap" style="padding-top:12px;">
-    <div id="title" class="viewerTitle"></div>
+<footer>
+  <div class="wrap" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:14px;">
+    <div class="hint">GitHub Pages · Google Form Poll</div>
+    <div class="hint">↑↓ 영상 이동 · ←→ 프롬프트 이동</div>
+  </div>
+</footer>
 
-    <div class="layout">
-      <!-- 좌측: 모델별 썸네일 리스트 -->
-      <aside class="sidebar">
-        <div class="head">모델별 영상</div>
-        <div id="list" class="list" aria-live="polite"></div>
-      </aside>
+<script>
+const INDEX_URL='prompts/index.json';
+const FORM_ACTION='https://docs.google.com/forms/d/e/1FAIpQLSdM9-XgDDEj6ger_I6CnpnUo6xi0OOBoJH3fuVcSweapVnyLA/formResponse';
+const ENTRY={
+  respondent:'entry.1754968065',
+  prompt:'entry.687308874',
+  SORA:'entry.1657125172',
+  VEO3:'entry.1802394734',
+  LUMALabs:'entry.675826076',
+  'WAN2.2':'entry.1513721864',
+  'LTX-Video':'entry.360849732',
+  order:'entry.783496875'
+};
 
-      <!-- 우측: 뷰어 + 노트 -->
-      <section class="viewer">
-        <div class="viewerBox" id="viewerBox"></div>
-        <div id="noteBox" class="noteBox">—</div>
-        <div class="hint">좌측에서 모델을 선택하면 우측 1080px 뷰어에서 루프 재생됩니다.</div>
-      </section>
-    </div>
-  </main>
+let indexData={prompts:[]};
+let curPrompt=0,curList=[],curVideoIdx=0;
 
-  <footer>
-    <div class="wrap" style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; padding-bottom:14px;">
-      <div class="hint">GitHub Pages · CSV → JSON 자동 생성</div>
-      <div class="hint">키보드 ↑/↓: 모델 이동 · ←/→: 프롬프트 이동</div>
-    </div>
-  </footer>
+// 순위 상태: 각 모델 인덱스 -> 랭크(1..5) 또는 null, 그리고 rank -> idx 역매핑으로 유일성 보장
+let ranksByIdx=[], idxByRank=[];
 
-  <script>
-    // ---------- 유틸 ----------
-    const qs = (s, el=document) => el.querySelector(s);
-    const qsa = (s, el=document) => [...el.querySelectorAll(s)];
-    const escapeHtml = s => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-    const paramIndex = () => Math.max(0, parseInt(new URL(location.href).searchParams.get('p')||'0',10));
-    const setParamIndex = (i) => { const u=new URL(location.href); u.searchParams.set('p', i); history.replaceState({},'',u.toString()); };
+const savedName = localStorage.getItem('respondentName')||'';
+document.getElementById('respondentInput').value=savedName;
 
-    // 유튜브 ID 추출(생 ID/URL/shorts/embed 혼용 안전)
-    function extractYtId(input) {
-      if (!input) return '';
-      const idLike = /^[a-zA-Z0-9_-]{10,12}$/;
-      if (idLike.test(input)) return input;
-      try {
-        const u = new URL(input);
-        if (u.hostname.includes('youtube.com')) {
-          if (u.searchParams.get('v')) return u.searchParams.get('v');
-          let m = u.pathname.match(/\/shorts\/([a-zA-Z0-9_-]+)/); if (m) return m[1];
-          m = u.pathname.match(/\/embed\/([a-zA-Z0-9_-]+)/);     if (m) return m[1];
-        }
-        if (u.hostname === 'youtu.be') {
-          const m = u.pathname.match(/^\/([a-zA-Z0-9_-]+)/);
-          if (m) return m[1];
-        }
-      } catch {}
-      const m = String(input).match(/(?:\?|&|^)v=([a-zA-Z0-9_-]{10,12})/);
-      return m ? m[1] : String(input).trim();
-    }
-    // --- selector label helpers ---
-    function _splitPidAndSettingFromTitle(title) {
-      const t = String(title || '').trim();
-      let pid = '', rest = t;
+const qs=(s,el=document)=>el.querySelector(s);
+const qsa=(s,el=document)=>[...el.querySelectorAll(s)];
 
-      // "P7 · ..." 같이 '·' 기준으로 PID 분리
-      const m = t.match(/^\s*([^·]+)\s*·\s*(.*)$/);
-      if (m) { pid = m[1].trim(); rest = m[2].trim(); }
+function ytEmbed(id,autoplay=false){
+  const q = ['rel=0','modestbranding=1','playsinline=1','mute=1','loop=1','playlist='+id];
+  if (autoplay) q.push('autoplay=1');
+  return `https://www.youtube.com/embed/${id}?${q.join('&')}`;
+}
+function ytThumb(id){return `https://i.ytimg.com/vi/${id}/default.jpg`;}
 
-      // "Setting:" 다음 텍스트만 추출(없으면 rest 전체 사용)
-      const m2 = rest.match(/Setting\s*:\s*(.*)/i);
-      const setting = (m2 ? m2[1] : rest).replace(/\s+/g, ' ').trim();
+function clearViewer(){qs('#viewerBox').innerHTML='';}
+function mountViewer(id,label,autoplay=false){
+  qs('#viewerBox').innerHTML=`<iframe class="viewerFrame" src="${ytEmbed(id,autoplay)}"
+    title="${label||''}" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture;web-share" allowfullscreen></iframe>`;
+}
+function selectVideo(i,autoplay=true){
+  if(!curList.length) return;
+  curVideoIdx=i;
+  const v=curList[i];
+  mountViewer(v.id,v.label,autoplay);
+  highlightActive();
+}
+function highlightActive(){
+  qsa('.item').forEach(el=>el.classList.remove('active'));
+  const act=qs(`.item[data-idx="${curVideoIdx}"]`); if (act) act.classList.add('active');
+}
 
-      return { pid, setting };
-    }
+function setSubmitEnabled(){
+  const complete = ranksByIdx.length===curList.length && ranksByIdx.every(x=>typeof x==='number' && x>=1 && x<=5);
+  qs('#submitBtn').disabled = !complete;
+}
 
-    function makeShortLabelFromTitle(title, maxLen = 38) {
-      const { pid, setting } = _splitPidAndSettingFromTitle(title);
-      let snippet = setting;
-      if (snippet.length > maxLen) snippet = snippet.slice(0, maxLen - 1) + '…';
-      return pid ? `${pid} · ${snippet}` : (snippet || title || '');
-    }
-    // 썸네일(저해상도 기본)
-    const ytThumb = (id) => `https://i.ytimg.com/vi/${id}/default.jpg`;
+/* 랭크 지정: 기존에 그 랭크/그 모델에 있던 값은 정리하고 새로 할당 (유일성 보장) */
+function assignRank(idx, rank){
+  if(rank<1 || rank>5) return;
+  const prevRank = ranksByIdx[idx];
+  if (prevRank === rank) {
+    // 같은 버튼을 다시 누르면 해당 랭크 유지(토글 해제 원하면 아래 주석 해제)
+    // clearRank(idx);
+    return;
+  }
+  // 1) 그 랭크에 다른 모델이 이미 있으면 해제
+  const conflictIdx = idxByRank[rank];
+  if (typeof conflictIdx === 'number') {
+    ranksByIdx[conflictIdx] = null;
+    idxByRank[rank] = null;
+  }
+  // 2) 이 모델에 기존 랭크 있었으면 해제
+  if (typeof prevRank === 'number') idxByRank[prevRank] = null;
 
-    // 루프 임베드
-    const ytEmbed = (id, autoplay = false) => {
-      const vid = extractYtId(id);
-      const q = [
-        'rel=0','modestbranding=1','playsinline=1',
-        'loop=1',`playlist=${vid}`,
-        autoplay ? 'autoplay=1' : '','mute=1'
-      ].filter(Boolean).join('&');
-      return `https://www.youtube.com/embed/${vid}?${q}`;
-    };
+  // 3) 신규 할당
+  ranksByIdx[idx] = rank;
+  idxByRank[rank] = idx;
+  renderList(false); // 버튼 상태만 갱신
+  setSubmitEnabled();
+}
 
-    // 노트(멀티라인) 포맷팅: 키워드 자동 볼드
-    function formatStructuredNote(str) {
-      const lines = String(str||'').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-      return lines.map(line => {
-        const m = line.match(/^(Setting|Action|Visuals|Camera|Mood|Duration)\s*:\s*(.*)$/i);
-        if (m) return `<div><b>${escapeHtml(m[1])}</b>: ${escapeHtml(m[2])}</div>`;
-        return `<div>${escapeHtml(line)}</div>`;
-      }).join('');
-    }
-
-    // ---------- 상태 ----------
-    const INDEX_URL = 'prompts/index.json';
-    let indexData = { prompts: [] }; // [{title,file}]
-    let curPrompt = Math.max(0, paramIndex());
-    let curList = [];      // 현재 프롬프트의 videos
-    let curVideoIdx = 0;
-
-    function clearViewer() { qs('#viewerBox').innerHTML = ''; }
-    function mountViewer(id, label, autoplay = false) {
-    const box = qs('#viewerBox');
-    box.innerHTML = `<iframe class="viewerFrame" src="${ytEmbed(id, autoplay)}"
-        title="${escapeHtml(label || '')}"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
-    }
-
-    function makeListItem(v, i) {
-      const vid = extractYtId(v.id);
-      const row = document.createElement('div');
-      row.className = 'item'; row.dataset.idx = String(i);
-      row.setAttribute('role','button'); row.setAttribute('tabindex','0');
-      row.innerHTML = `
-        <div class="thumbBox"><img class="thumb" loading="lazy" src="${ytThumb(vid)}" alt="${escapeHtml(v.label||('Video '+(i+1)))} thumbnail"></div>
-        <div>
-          <div class="label">${escapeHtml(v.label || ('Video '+(i+1)))}</div>
-          <div class="sub">${escapeHtml(vid)}</div>
+function renderList(resetButtons=true){
+  const listEl=qs('#list'); if (resetButtons) listEl.innerHTML='';
+  curList.forEach((v,i)=>{
+    let row = qs(`.item[data-idx="${i}"]`);
+    if (!row) {
+      row = document.createElement('div');
+      row.className='item'; row.dataset.idx=i;
+      row.innerHTML=`
+        <div class="info">
+          <div class="thumbBox"><img class="thumb" loading="lazy" src="${ytThumb(v.id)}" alt=""></div>
+          <div class="label">${v.label||('Video '+(i+1))}</div>
         </div>
-      `;
-      row.addEventListener('click', () => selectVideo(i, true));
-      row.addEventListener('keydown', (e) => {
-        if (e.key==='Enter' || e.key===' ') { e.preventDefault(); selectVideo(i, true); }
-        });
-    return row;
-    
+        <div class="rankCol">
+          <span class="rankTag" id="rankTag-${i}"></span>
+          <div class="rankBtns" id="rankBtns-${i}"></div>
+        </div>`;
+      // 좌측 정보 클릭 -> 영상 재생만
+      row.querySelector('.info').addEventListener('click', ()=>selectVideo(i, true));
+      listEl.appendChild(row);
     }
-
-    function highlightActive() {
-      qsa('.item').forEach(el => el.classList.remove('active'));
-      const active = qs(`.item[data-idx="${curVideoIdx}"]`);
-      if (active) active.classList.add('active');
-    }
-
-    function selectVideo(i, autoplay = true) {
-        if (!curList.length) return;
-        if (i < 0) i = 0;
-        if (i >= curList.length) i = curList.length - 1;
-        curVideoIdx = i;
-        const v = curList[curVideoIdx];
-        mountViewer(v.id, v.label || `Video ${curVideoIdx+1}`, autoplay);
-        highlightActive();
-    }
-
-    async function renderPrompt(idx) {
-      if (!indexData.prompts.length) return;
-      if (idx < 0) idx = 0;
-      if (idx >= indexData.prompts.length) idx = indexData.prompts.length - 1;
-      curPrompt = idx; setParamIndex(curPrompt);
-
-      const meta = qs('#metaText');
-      const titleEl = qs('#title');
-      const listEl = qs('#list');
-      meta.textContent = `프롬프트 ${curPrompt+1} / ${indexData.prompts.length}`;
-      listEl.innerHTML = ''; clearViewer();
-      const item = indexData.prompts[curPrompt];
-      titleEl.textContent = item.title || `Prompt #${curPrompt+1}`;
-
-      try {
-        const res = await fetch(item.file, { cache:'no-store' });
-        if (!res.ok) throw new Error(`로드 실패: ${item.file}`);
-        const payload = await res.json();
-
-        // videos: [{id, label}] 을 그대로 표시(모델명 라벨)
-        curList = Array.isArray(payload.videos) ? payload.videos.filter(Boolean) : [];
-        curList.forEach((v,i) => listEl.appendChild(makeListItem(v,i)));
-
-        // note: 문자열이면 멀티라인 유지, 객체/배열도 허용
-        const noteHtml = payload.note ? formatStructuredNote(payload.note) : '';
-        qs('#noteBox').innerHTML = noteHtml || '—';
-
-        // 첫 항목 자동 선택
-        curVideoIdx = 0;
-        if (curList[0]) selectVideo(0, false);  // ← 처음엔 자동재생 OFF
-        else clearViewer();
-
-      } catch (e) {
-        listEl.innerHTML = `<div class="hint" style="padding:10px;">불러오는 중 오류: ${escapeHtml(e.message)}</div>`;
-        qs('#noteBox').textContent = '—';
+    // 버튼 갱신
+    const btnBox = row.querySelector(`#rankBtns-${i}`);
+    if (resetButtons) btnBox.innerHTML='';
+    const myRank = ranksByIdx[i];
+    if (resetButtons) {
+      for (let r=1; r<=5; r++){
+        const b=document.createElement('button');
+        b.className='rankBtn'+(myRank===r?' active':'');
+        b.textContent=r;
+        b.addEventListener('click',(e)=>{ e.stopPropagation(); assignRank(i, r); });
+        btnBox.appendChild(b);
       }
-
-      // 셀렉터/버튼 상태
-      const sel = qs('#promptSelector');
-      if (sel.value !== String(curPrompt)) sel.value = String(curPrompt);
-      qs('#prevBtn').disabled = (curPrompt===0);
-      qs('#nextBtn').disabled = (curPrompt===indexData.prompts.length-1);
-
-      // 다음 프롬프트 프리페치
-      const nextItem = indexData.prompts[curPrompt+1];
-      if (nextItem) {
-        const l = document.createElement('link'); l.rel = 'prefetch'; l.as = 'fetch'; l.href = nextItem.file; document.head.appendChild(l);
-      }
-    }
-
-    async function init() {
-      const res = await fetch(INDEX_URL, { cache:'no-store' });
-      if (!res.ok) throw new Error('index.json 로딩 실패');
-      indexData = await res.json();
-      if (!Array.isArray(indexData.prompts)) indexData.prompts = [];
-
-      const sel = qs('#promptSelector'); sel.innerHTML = '';
-      indexData.prompts.forEach((p, i) => {
-        const opt = document.createElement('option');
-        opt.value = String(i);
-        const full = p.title || `Prompt #${i+1}`; // 상단/툴팁용 풀 타이틀
-        opt.textContent = makeShortLabelFromTitle(full); // 드롭다운엔 짧게
-        opt.title = full; // 길면 툴팁으로 전체 표시
-        sel.appendChild(opt);
+    } else {
+      // active 상태만 업데이트
+      qsa('.rankBtn', btnBox).forEach((b,idx)=> {
+        const r = idx+1;
+        b.classList.toggle('active', myRank===r);
       });
-      qs('#prevBtn').addEventListener('click', ()=>renderPrompt(curPrompt-1));
-      qs('#nextBtn').addEventListener('click', ()=>renderPrompt(curPrompt+1));
-      sel.addEventListener('change', e=>renderPrompt(parseInt(e.target.value,10)||0));
-      window.addEventListener('keydown', (e)=>{
-        if (e.key==='ArrowLeft' && curPrompt>0) renderPrompt(curPrompt-1);
-        if (e.key==='ArrowRight'&& curPrompt<indexData.prompts.length-1) renderPrompt(curPrompt+1);
-        if (e.key==='ArrowUp')  { e.preventDefault(); selectVideo(curVideoIdx-1); }
-        if (e.key==='ArrowDown'){ e.preventDefault(); selectVideo(curVideoIdx+1); }
-      });
-
-      await renderPrompt(paramIndex());
     }
+    // 태그(몇 위) 갱신
+    const tag = row.querySelector(`#rankTag-${i}`);
+    tag.textContent = (typeof myRank==='number') ? `${myRank}위` : '';
+  });
+  highlightActive();
+}
 
-    init().catch(err => { qs('#metaText').textContent = '초기화 실패: '+err.message; console.error(err); });
-  </script>
+function formatStructuredNote(str) {
+  const lines = String(str||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  return lines.map(line=>{
+    const m = line.match(/^(Setting|Action|Visuals|Camera|Mood|Duration)\s*:\s*(.*)$/i);
+    if (m) return `<div><b>${m[1]}</b>: ${m[2]}</div>`;
+    return `<div>${line}</div>`;
+  }).join('');
+}
+
+async function renderPrompt(idx){
+  if(idx<0) idx=0;
+  if(idx>=indexData.prompts.length) idx=indexData.prompts.length-1;
+  curPrompt = idx;
+  qs('#metaText').textContent = `프롬프트 ${idx+1}/${indexData.prompts.length}`;
+
+  // 초기화
+  ranksByIdx = []; idxByRank = [];
+  qs('#submitBtn').disabled = true;
+
+  // 노트/비디오
+  const item=indexData.prompts[idx];
+  try{
+    const res=await fetch(item.file,{cache:'no-store'});
+    const payload=await res.json();
+    curList = payload.videos || [];
+    ranksByIdx = new Array(curList.length).fill(null);
+    idxByRank = new Array(6).fill(null); // 1..5 사용
+    renderList(true);
+    // 노트
+    qs('#noteBox').innerHTML = payload.note ? formatStructuredNote(payload.note) : '';
+    // 첫 항목 자동 재생 OFF
+    if(curList[0]) selectVideo(0, false); else clearViewer();
+  }catch(e){
+    qs('#list').innerHTML = `<div class="hint" style="padding:10px;">로드 오류: ${e.message}</div>`;
+    qs('#noteBox').textContent = '';
+    clearViewer();
+  }
+
+  // 드롭다운/버튼 상태
+  const sel=qs('#promptSelector'); if (sel.value!==String(idx)) sel.value=String(idx);
+  qs('#prevBtn').disabled = (idx===0);
+  qs('#nextBtn').disabled = (idx===indexData.prompts.length-1);
+}
+
+async function init(){
+  // 인덱스 로드
+  const res=await fetch(INDEX_URL,{cache:'no-store'});
+  indexData=await res.json();
+  if(!Array.isArray(indexData.prompts)) indexData.prompts=[];
+
+  // 드롭다운 구성 (긴 제목은 자동 생략)
+  const sel=qs('#promptSelector'); sel.innerHTML='';
+  indexData.prompts.forEach((p,i)=>{
+    const o=document.createElement('option');
+    o.value=String(i);
+    o.textContent=`${i+1}. ${p.title||''}`;
+    o.title=p.title||'';
+    sel.appendChild(o);
+  });
+
+  // 이벤트
+  qs('#prevBtn').addEventListener('click',()=>renderPrompt(curPrompt-1));
+  qs('#nextBtn').addEventListener('click',()=>renderPrompt(curPrompt+1));
+  sel.addEventListener('change',e=>renderPrompt(parseInt(e.target.value,10)||0));
+
+  // 응답자 이름 저장
+  const nameInput=qs('#respondentInput');
+  nameInput.addEventListener('blur',()=>localStorage.setItem('respondentName',nameInput.value.trim()));
+  nameInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); localStorage.setItem('respondentName',nameInput.value.trim()); }});
+
+  // 저장
+  qs('#submitBtn').addEventListener('click', submitPoll);
+
+  await renderPrompt(0);
+}
+
+function currentPromptId(){
+  // prompts[index].id가 있으면 사용, 없으면 P<N>
+  const meta = indexData.prompts[curPrompt];
+  return meta && meta.id ? meta.id : ('P'+(curPrompt+1));
+}
+
+async function submitPoll(){
+  // 모든 모델에 1~5가 지정되어 있어야 저장 가능
+  if(!(ranksByIdx.length===curList.length && ranksByIdx.every(x=>typeof x==='number'))) {
+    alert('5개 모두 순위를 지정해주세요.');
+    return;
+  }
+  const respondent = qs('#respondentInput').value.trim();
+  localStorage.setItem('respondentName', respondent);
+
+  // OrderString = 모델 순서대로의 랭크를 이어붙인 문자열(예: '34512')
+  const orderString = ranksByIdx.join('');
+
+  const form = new URLSearchParams();
+  form.append(ENTRY.respondent, respondent);
+  form.append(ENTRY.prompt, currentPromptId());
+  curList.forEach((v, idx)=>{
+    const ek = ENTRY[v.label];            // SORA/VEO3/LUMALabs/WAN2.2/LTX-Video
+    if (ek) form.append(ek, String(ranksByIdx[idx]||'')); // 1..5
+  });
+  if (ENTRY.order) form.append(ENTRY.order, orderString);
+
+  try{
+    await fetch(FORM_ACTION, {
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: form.toString()
+    });
+    alert('저장 완료! 시트에서 확인하세요.');
+  }catch(e){
+    console.error(e);
+    alert('저장 중 오류가 발생했습니다. 다시 시도해주세요.');
+  }
+}
+
+init();
+</script>
 </body>
 </html>
