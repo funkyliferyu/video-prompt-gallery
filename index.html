@@ -453,11 +453,11 @@ async function submitPoll(){
       throw new Error(`HTTP ${res.status}`);
     }
 
-    alert('저장 완료! (Supabase)');
+    alert('저장 완료!');
     localStorage.setItem('respondentName', respondent);
   } catch (e) {
     console.error(e);
-    alert('저장 오류: Supabase URL/Key, RLS 정책, 네트워크를 확인해주세요.');
+    alert('저장 오류: 다시 한번 시도해 보세요. 문제가 계속되면 류연근M에게 메일로 알려주세요.');
   }
 }
 
