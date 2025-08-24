@@ -1,3 +1,6 @@
+
+
+
 <!doctype html>
 <html lang="ko">
 <head>
@@ -127,29 +130,38 @@
 </footer>
 
 <script>
-const INDEX_URL='prompts/index.json';
-const FORM_ACTION='https://docs.google.com/forms/d/e/1FAIpQLSdM9-XgDDEj6ger_I6CnpnUo6xi0OOBoJH3fuVcSweapVnyLA/formResponse';
-// const ENTRY={
-//  respondent:'entry.1754968065',
-//  prompt:'entry.687308874',
-  //SORA:'entry.1657125172',
-//  VEO3:'entry.1802394734',
-//  LUMALabs:'entry.675826076',
-//  'WAN2.2':'entry.1513721864',
-//  'LTX-Video':'entry.360849732',
-//  order:'entry.783496875'
-//};
+// const FORM_ACTION='https://docs.google.com/forms/d/e/1FAIpQLSdM9-XgDDEj6ger_I6CnpnUo6xi0OOBoJH3fuVcSweapVnyLA/formResponse';
+// const ENTRY = {
+//   respondent: 'entry.577493348',
+//   prompt:     'entry.1100587388',
+//   SORA:       'entry.590964581',
+//   VEO3:       'entry.594922169',
+//   LUMALabs:   'entry.329427994',
+//   'WAN v2.2': 'entry.710987574',
+//   'LTX-Video':'entry.1025399171',
+//   order:      'entry.1770970872'
+// };
+/* === Supabase REST 설정 (네가 채울 2곳) === */
+const SB_URL = 'https://znefyrtgpnjtgcmxgfmq.supabase.co';   // ← Project Settings → API → Project URL
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpuZWZ5cnRncG5qdGdjbXhnZm1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYwNTY5MjcsImV4cCI6MjA3MTYzMjkyN30.Sgrl91SmbgtYSfjiS0XFvAHCZMJVkrZSaSv5yR8W1jc';               // ← Project Settings → API → anon public key
+const SB_TABLE = 'poll_responses';                   // SQL에서 만든 테이블명 (변경 없으면 그대로)
 
-const ENTRY = {
-  respondent: 'entry.577493348',   // Name
-  prompt:     'entry.1100587388',  // Prompt_ID
-  SORA:       'entry.590964581',
-  VEO3:       'entry.594922169',
-  LUMALabs:   'entry.329427994',
-  'WAN v2.2': 'entry.710987574',
-  'LTX-Video':'entry.1025399171',
-  order:      'entry.1770970872'   // OrderString
+/* 좌측 목록의 모델 라벨 → DB 컬럼 매핑 */
+const COL_BY_LABEL = {
+  'SORA': 'sora',
+  'VEO3': 'veo3',
+  'LUMALabs': 'lumalabs',
+  'WAN v2.2': 'wan_v2_2',
+  'LTX-Video': 'ltx_video'
 };
+
+/* 라벨 오타/표기 보정 (예: WAN2.2 → WAN v2.2) */
+function normalizeLabel(label) {
+  const s = String(label).trim();
+  if (s === 'WAN2.2' || s === 'WAN 2.2' || s === 'WANv2.2') return 'WAN v2.2';
+  return s;
+}
+
 
 
 
@@ -356,41 +368,105 @@ function currentPromptId(){
   return meta && meta.id ? meta.id : ('P'+(curPrompt+1));
 }
 
-async function submitPoll(){
-  const respondent = qs('#respondentInput').value.trim();
-  if (!respondent) { alert('이름은 필수입니다. (이벤트 응모)'); return; }
-  if (ranking.length !== curList.length){ alert('5개 모두 순위를 지정해주세요.'); return; }
-  localStorage.setItem('respondentName', respondent);
+// async function submitPoll(){
+//   const respondent = qs('#respondentInput').value.trim();
+//   if (!respondent) { alert('이름은 필수입니다. (이벤트 응모)'); return; }
+//   if (ranking.length !== curList.length){ alert('5개 모두 순위를 지정해주세요.'); return; }
+//   localStorage.setItem('respondentName', respondent);
 
-  // 모델별 랭크 맵 만들기
-  const rankMap = new Map(); // idx -> rank(1..N)
-  ranking.forEach((r, i)=> rankMap.set(r.idx, i+1));
+//   const rankMap = new Map(); ranking.forEach((r, i)=> rankMap.set(r.idx, i+1));
+//   const orderString = curList.map((_,i)=>rankMap.get(i)||'').join('');
+
+//   const form = new URLSearchParams();
+//   form.append(ENTRY.respondent, respondent);
+//   form.append(ENTRY.prompt, currentPromptId());
+//   curList.forEach((v,i)=>{
+//     const ek = ENTRY[v.label];
+//     if (ek) form.append(ek, String(rankMap.get(i)||''));
+//   });
+//   if (ENTRY.order) form.append(ENTRY.order, orderString);
+
+//   try{
+//     await fetch(FORM_ACTION, {
+//       method:'POST',
+//       mode:'no-cors',
+//       headers:{'Content-Type':'application/x-www-form-urlencoded'},
+//       body: form.toString()
+//     });
+//     alert('저장 완료! 시트에서 확인하세요.');
+//   }catch(e){
+//     console.error(e);
+//     alert('저장 중 오류가 발생했습니다. 다시 시도해주세요.');
+//   }
+// }
+/* === Supabase로 저장하는 버전 === */
+
+// 프롬프트 인덱스(JSON) 경로
+const INDEX_URL = 'prompts/index.json';
+
+
+async function submitPoll(){
+  const nameEl = qs('#respondentInput');
+  const respondent = nameEl.value.trim();
+  if (!respondent) { alert('이름은 필수입니다. (이벤트 응모)'); nameEl.focus(); return; }
+
+  // 5개 모두 순차 선택했는지 확인
+  if (ranking.length !== curList.length){
+    alert('5개 모두 순위를 지정해주세요.');
+    return;
+  }
+
+  // 인덱스 → 랭크(1..5)
+  const rankMap = new Map();
+  ranking.forEach((r,i)=> rankMap.set(r.idx, i+1));
   const orderString = curList.map((_,i)=>rankMap.get(i)||'').join('');
 
-  const form = new URLSearchParams();
-  form.append(ENTRY.respondent, respondent);
-  form.append(ENTRY.prompt, currentPromptId());
+  // DB에 보낼 한 행(row) 구성
+  const row = {
+    prompt_id: currentPromptId(),
+    respondent,
+    order_string: orderString,
+    user_agent: navigator.userAgent,
+    sora: null, veo3: null, lumalabs: null, wan_v2_2: null, ltx_video: null
+  };
   curList.forEach((v,i)=>{
-    const ek = ENTRY[v.label];
-    if (ek) form.append(ek, String(rankMap.get(i)||'')); // 1..5
+    const label = normalizeLabel(v.label);
+    const col   = COL_BY_LABEL[label];
+    if (col) row[col] = rankMap.get(i) || null;
   });
-  if (ENTRY.order) form.append(ENTRY.order, orderString);
 
-  try{
-    await fetch(FORM_ACTION, {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`, {
       method:'POST',
-      mode:'no-cors',
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body: form.toString()
+      headers:{
+        'apikey': SB_KEY,
+        'Authorization': `Bearer ${SB_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify([row])   // 여러 건이면 배열로 함께 전송 가능
     });
-    alert('저장 완료! 시트에서 확인하세요.');
-  }catch(e){
+
+    if (!res.ok) {
+      // (선택) prompt_id+respondent 유니크 제약을 걸었고 중복이면 409
+      if (res.status === 409) { alert('이미 제출된 사용자/프롬프트입니다.'); return; }
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    alert('저장 완료! (Supabase)');
+    localStorage.setItem('respondentName', respondent);
+  } catch (e) {
     console.error(e);
-    alert('저장 중 오류가 발생했습니다. 다시 시도해주세요.');
+    alert('저장 오류: Supabase URL/Key, RLS 정책, 네트워크를 확인해주세요.');
   }
 }
 
-init();
+
+init().catch(err => {
+  document.querySelector('#metaText').textContent = '초기화 실패: ' + err.message;
+  console.error(err);
+});
+
 </script>
 </body>
 </html>
